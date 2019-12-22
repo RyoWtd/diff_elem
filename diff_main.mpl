@@ -1,12 +1,21 @@
 with(LinearAlgebra):
 
+# 計算次数
 ord:=3:
 tyl:=3:
 
-# 部材数
-nu0:=2:
-# 節点数
-nd0:=3:
+# inp_param.dat
+#  モデル概要データ
+#  順に
+#  nu0 : 部材数
+#  nd0 : 節点数
+#  ndr : 固定自由度数
+#  nc : 追加拘束条件数
+inpparam:=ImportVector("inp_param.csv"):
+nu0:=inpparam[1]:
+nd0:=inpparam[2]:
+ndr:=inpparam[3]:
+nc:=inpparam[4]:
 # 全自由度数
 ndt:=nd0*6+nu0*6:
 
@@ -15,36 +24,112 @@ nue:=20: #要素非適合量数
 # この中から選ぶ
 nde:=18: #要素自由度数
 
-
-# idx: 固定する自由度
-ndr:=7: #固定自由度数
 nd:=ndt-ndr: #固定自由度数を除いた全自由度数
 # 全体自由度の順番:はじめに全節点の並進UU*3,回転TT*3,
 #                次に各要素中央点の並進VV*3,回転PP*3
-idxf:=Vector([1,2,3,4,6,14,15]): #問題設定
+
+# 座標定義
+# inp_coord.csvから読み込み
+xvg:=[seq(Vector([0,0,0]),i=1..nd0)]:
+temp:=ImportMatrix("inp_coord.csv", delimiter=","):
+for i from 1 to nd0 do
+  for j from 1 to 3 do
+    if type(temp[i][j],string) = true then
+      xvg[i][j]:=parse(temp[i][j]):
+    else
+      xvg[i][j]:=temp[i][j]:
+    end if:
+  end do:
+end do:
+# xvg[2][1]:=1.0:
+# xvg[3][1]:=2.0:
+
+# idx: 固定する自由度
+# 固定自由度をinp_fix.csvから読み込み
+# idxf:=Vector([1,2,3,4,6,14,15]): #問題設定
 idx:=Vector(ndt):
 for i from 1 to ndt do
- idx[i]:=i:
+    idx[i]:=i:
+end do:
+if ndr > 0 then
+    temp2:=ImportMatrix("inp_fix.csv", delimiter=","):
+    idxf:=Vector(ndr):
+    for i from 1 to ndr do
+        idxf[i]:= (temp2[i][1]-1)*6 + temp2[i][2]:
+    end do:
+    for i from 1 to ndr do
+        idx[idxf[i]] := 0:
+    end do:
+    k:=1:
+    for i from 1 to ndt do
+        if idx[i] <> 0 then
+            idx[k] := idx[i]:
+            k:=k+1:
+        end if:
+    end do:
+    for i from k to ndt do
+        idx[i] := 0:
+    end do:
+end if:
+
+# 接続情報
+#  (inp_cnn.dat から読み込み)
+#  cnn    : 各部材の始終端節点番号
+cnn:=[seq([0,0],i=1..nu0)]:
+tempM:=ImportMatrix("inp_cnn.csv",delimiter=","):
+for i from 1 to nu0 do
+ for j from 1 to 2 do
+  cnn[i][j] := tempM[i,j]:
+ end do:
+end do:
+# cnn[1][1]:=1:
+# cnn[1][2]:=2:
+# cnn[2][1]:=2:
+# cnn[2][2]:=3:
+
+# 回転ヒンジの数情報
+# 1:1本（レボリュートジョイント）, 2:2本（ユニバーサルジョイント）
+#  (inp_n_hinge.dat から読み込み)
+#  ih     : 各部材の始終端ヒンジ軸数（1:ヒンジ,2:ユニバーサルジョイント)
+ih:=[seq([0,0],i=1..nu0)]:
+tempM:=ImportMatrix("inp_n_hinge.csv",delimiter=","):
+for i from 1 to nu0 do
+ for j from 1 to 2 do
+  ih[i][j] := tempM[i,j]:
+ end do:
+end do:
+# ih[2][1]:=1:
+
+# 局所座標でのヒンジ方向
+# 1箇所に2軸まで定義可能とした
+
+# ヒンジ方向の読み込み（各部材局所座標系で指定）
+#  (inp_hinge_ind.dat, inp_hinge_vec.dat より読み込み）
+#  hht[i][j][k]  : 部材iのj端側k番目のヒンジ軸の方向ベクトル（局所座標系）
+#  hhg[i][j][k] : 部材iのj端側k番目のヒンジ軸の方向ベクトル（全体座標系）
+hht:=[seq[seq(seq(Vector([0,0,0]),l=1..2),j=1..2)],i=1..nu0]:
+
+# hht[2][1][1]:=Vector([sqrt(2)/2,sqrt(2)/2,0]): # model B
+# hht[2][1][1]:=Vector([0,1,0]): # model A
+
+tempM2:=ImportMatrix("inp_hinge_ind.csv", delimiter=","):
+tempM3:=ImportMatrix("inp_hinge_vec.csv", delimiter=","):
+aa:=RowDimension(tempM2);
+tempM3temp:=Vector(3):
+for i from 1 to aa do
+  for j from 1 to 3 do
+    if type(tempM3[i,j],string) = true then
+      tempM3temp[j] := parse(tempM3[i,j]):
+    else
+      tempM3temp[j] := tempM3[i,j]:
+    end if:
+  end do:
+  hht[tempM2[i,1]][tempM2[i,2]][tempM2[i,3]]:=Vector([tempM3temp[1],tempM3temp[2],tempM3temp[3]]):
 end do:
 
-for i from 1 to ndr do
- idx[idxf[i]] := 0:
-end do:
 
-k:=1:
-for i from 1 to ndt do
- if idx[i] <> 0 then
-  idx[k] := idx[i]:
-  k:=k+1:
- end if:
-end do:
 
-for i from k to ndt do
- idx[i] := 0:
-end do:
 
-# ファイルから読み込みに修正
-# さらに修正
 # IDM[k] : 削減前自由度番号kの削減後自由度番号
 IDM:=Vector(ndt):
 ii:=1:
@@ -71,31 +156,6 @@ else
     end do:
 end if:
 ExportVector("IDM.dat",IDM,target=delimited,delimiter=" "):
-
-# 座標定義
-xvg:=[seq(Vector([0,0,0]),i=1..nd0)]:
-xvg[2][1]:=1.0:
-xvg[3][1]:=2.0:
-
-# 接続情報
-cnn:=[seq([0,0],i=1..nu0)]:
-cnn[1][1]:=1:
-cnn[1][2]:=2:
-cnn[2][1]:=2:
-cnn[2][2]:=3:
-
-# 回転ヒンジの数情報
-# 1:1本（レボリュートジョイント）, 2:2本（ユニバーサルジョイント）
-ih:=[seq([0,0],i=1..nu0)]:
-
-ih[2][1]:=1:
-
-# 局所座標でのヒンジ方向
-# 1箇所に2軸まで定義可能とした
-hht:=[seq[seq(seq(Vector([0,0,0]),l=1..2),j=1..2)],i=1..nu0]:
-
-hht[2][1][1]:=Vector([sqrt(2)/2,sqrt(2)/2,0]): # model B
-# hht[2][1][1]:=Vector([0,1,0]): # model A
 
 # 要素自由度番号-全体自由度番号（固定自由度削減前）関係の作成
 LMOF:=[seq(Vector(nde),j=1..nu0)]:
