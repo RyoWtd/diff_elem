@@ -4,5 +4,4 @@ H3/
 octave/
 out/
 *.dat
-*.m
 *.csv
