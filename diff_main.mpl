@@ -425,16 +425,24 @@ ExportMatrix("./out/HH.dat",HH,delimiter=" ");
 ExportMatrix("./out/HH2.dat",tmp2,delimiter=" ");
 ExportMatrix("./out/HH3.dat",tmp3,delimiter=" ");
 
-# 特異値分解
+# 特異値分解(maple) (octave上でも実行するので、無しでも良い)
 
-rrr:=Rank(HH);
-S, U, Vt:=SingularValues(HH,output=['S','U','Vt']):
+# rrr:=Rank(HH);
+# S, U, Vt:=SingularValues(HH,output=['S','U','Vt']):
+# ExportVector("sv.dat",S,delimiter=" ");
+# ExportVector("left.dat",Row(U,nu),delimiter=" ");
+# ExportVector("right.dat",Transpose(Row(Vt,nd)),delimiter=" ");
 
-ExportVector("sv.dat",S,delimiter=" ");
-ExportVector("left.dat",Row(U,nu),delimiter=" ");
 
-ExportVector("right.dat",Transpose(Row(Vt,nd)),delimiter=" ");
 
+# g2*beta,g3*beta計算(octave)
+
+system("octave-cli coef.m");
+
+inp_g2beta:=ImportVector("./octave/c2-m.dat"):
+inp_g3beta:=ImportVector("./octave/c3-m.dat"):
+inp_g2beta;
+inp_g3beta;
 
 quit;
 
