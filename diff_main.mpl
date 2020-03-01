@@ -98,7 +98,6 @@ for i from 1 to nu0 do
   ih[i][j] := tempM[i,j]:
  end do:
 end do:
-# ih[2][1]:=1:
 
 # 局所座標でのヒンジ方向
 # 1箇所に2軸まで定義可能とした
@@ -107,27 +106,45 @@ end do:
 #  (inp_hinge_ind.dat, inp_hinge_vec.dat より読み込み）
 #  hht[i][j][k]  : 部材iのj端側k番目のヒンジ軸の方向ベクトル（局所座標系）
 #  hhg[i][j][k] : 部材iのj端側k番目のヒンジ軸の方向ベクトル（全体座標系）
+
 hht:=[seq[seq(seq(Vector([0,0,0]),l=1..2),j=1..2)],i=1..nu0]:
+
+# 200216 最適化テストのためコメントアウトここから<<
+# tempM2:=ImportMatrix("inp_hinge_ind.csv", delimiter=","):
+# tempM3:=ImportMatrix("inp_hinge_vec.csv", delimiter=","):
+# aa:=RowDimension(tempM2);
+# tempM3temp:=Vector(3):
+# for i from 1 to aa do
+#   for j from 1 to 3 do
+#     if type(tempM3[i,j],string) = true then
+#       tempM3temp[j] := parse(tempM3[i,j]):
+#     else
+#       tempM3temp[j] := tempM3[i,j]:
+#     end if:
+#   end do:
+#   hht[tempM2[i,1]][tempM2[i,2]][tempM2[i,3]]:=Vector([tempM3temp[1],tempM3temp[2],tempM3temp[3]]):
+# end do:
+# >>ここまで
+
+# ##############################################
+# 200216 最適化テスト proc化
+# ##############################################
+IterCount0:=Vector([0]):
+ExportVector("IterCount.dat",IterCount0,target=delimited,delimiter=" "):
+
+objp := proc (VecD)
+# 以下，beta*g2の出力まですべてproc objp
+IterCount:=Vector([0]):
+temp:=ImportVector("IterCount.dat"):
+IterCount[1]:=temp[1]+1:
+print("Iteration Count=",IterCount[1]):
+ExportVector("IterCount.dat",IterCount,target=delimited,delimiter=" "):
+
+hht[2][1][1]:=Vector([VecD[1],VecD[2],0]):
+print(hht[2][1][1]);
 
 # hht[2][1][1]:=Vector([sqrt(2)/2,sqrt(2)/2,0]): # model B
 # hht[2][1][1]:=Vector([0,1,0]): # model A
-
-tempM2:=ImportMatrix("inp_hinge_ind.csv", delimiter=","):
-tempM3:=ImportMatrix("inp_hinge_vec.csv", delimiter=","):
-aa:=RowDimension(tempM2);
-tempM3temp:=Vector(3):
-for i from 1 to aa do
-  for j from 1 to 3 do
-    if type(tempM3[i,j],string) = true then
-      tempM3temp[j] := parse(tempM3[i,j]):
-    else
-      tempM3temp[j] := tempM3[i,j]:
-    end if:
-  end do:
-  hht[tempM2[i,1]][tempM2[i,2]][tempM2[i,3]]:=Vector([tempM3temp[1],tempM3temp[2],tempM3temp[3]]):
-end do:
-
-
 
 
 # IDM[k] : 削減前自由度番号kの削減後自由度番号
@@ -443,6 +460,47 @@ inp_g2beta:=ImportVector("./octave/c2-m.dat"):
 inp_g3beta:=ImportVector("./octave/c3-m.dat"):
 inp_g2beta;
 inp_g3beta;
+
+print("objctive value =", inp_g3beta[1]^2);
+
+return inp_g2beta[1]^2+inp_g3beta[1]^2:
+end proc:
+
+# ######################################
+# objp ここまで
+# ######################################
+
+# 制約条件
+nlc := proc(VecD, VecW, needc)
+        # if needc[1] > 0.0 then
+            VecW[1] := VecD[1]^2-VecD[2]^2:
+        # end if:
+        if needc[2] > 0.0 then
+            VecW[2] := VecD[1]^2+VecD[2]^2-1.0
+        end if:
+    end proc:
+
+# 初期解
+# VecDinit := Vector([sqrt(2)/2,sqrt(2)/2]):
+VecDinit := Vector([1/2,sqrt(3)/2]):
+
+# テスト
+# objp(VecDinit);
+# quit;
+
+# 最適化実行
+with(Optimization):
+
+NLPSolve(
+    2, objp, [1,1], nlc, 
+    # iterationlimit=3,
+    initialpoint=VecDinit
+    # method=sqp,
+    # objectivegradient=objgra,
+    # constraintjacobian=conjac,
+);
+
+
 
 quit;
 
